@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: cloudpulse-postgres
+    environment:
+      POSTGRES_DB: cloudpulse
+      POSTGRES_USER: cloudpulse
+      POSTGRES_PASSWORD: cloudpulse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - cloudpulse_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  cloudpulse_postgres_data:
