@@ -4,13 +4,45 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"cloudpulse/internal/service"
+
 	"github.com/go-chi/chi/v5"
 )
 
-func NewRouter() http.Handler {
+func NewRouter(
+	serviceHandler *service.Handler,
+) http.Handler {
 	router := chi.NewRouter()
 
-	router.Get("/health", healthHandler)
+	router.Get(
+		"/health",
+		healthHandler,
+	)
+
+	router.Route(
+		"/api/services",
+		func(router chi.Router) {
+			router.Post(
+				"/",
+				serviceHandler.Create,
+			)
+
+			router.Get(
+				"/",
+				serviceHandler.FindAll,
+			)
+
+			router.Get(
+				"/{id}",
+				serviceHandler.FindByID,
+			)
+
+			router.Delete(
+				"/{id}",
+				serviceHandler.Delete,
+			)
+		},
+	)
 
 	return router
 }
@@ -24,9 +56,13 @@ func healthHandler(
 		"application/json",
 	)
 
-	writer.WriteHeader(http.StatusOK)
+	writer.WriteHeader(
+		http.StatusOK,
+	)
 
-	_ = json.NewEncoder(writer).Encode(
+	_ = json.NewEncoder(
+		writer,
+	).Encode(
 		map[string]string{
 			"status": "ok",
 		},

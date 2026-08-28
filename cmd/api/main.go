@@ -13,6 +13,7 @@ import (
 	"cloudpulse/internal/config"
 	"cloudpulse/internal/database"
 	"cloudpulse/internal/httpapi"
+	"cloudpulse/internal/service"
 )
 
 func main() {
@@ -32,8 +33,18 @@ func main() {
 	}
 
 	log.Println("connected to PostgreSQL")
+	serviceRepository :=
+		service.NewRepository(
+			dbPool,
+		)
 
-	router := httpapi.NewRouter()
+	serviceHandler :=
+		service.NewHandler(
+			serviceRepository,
+		)
+	router := httpapi.NewRouter(
+		serviceHandler,
+	)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
