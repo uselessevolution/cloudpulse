@@ -12,7 +12,9 @@ import (
 
 	"cloudpulse/internal/config"
 	"cloudpulse/internal/database"
+	"cloudpulse/internal/healthcheck"
 	"cloudpulse/internal/httpapi"
+	"cloudpulse/internal/monitoring"
 	"cloudpulse/internal/service"
 )
 
@@ -22,7 +24,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	appContext := context.Background()
+	appContext, appCancel :=
+		context.WithCancel(
+			context.Background(),
+		)
+
+	defer appCancel()
 
 	dbPool, err := database.NewPostgresPool(
 		appContext,
@@ -38,14 +45,39 @@ func main() {
 			dbPool,
 		)
 
+	healthCheckRepository :=
+		healthcheck.NewRepository(
+			dbPool,
+		)
+
+	checker :=
+		healthcheck.NewChecker()
+
+	workerPool :=
+		healthcheck.NewWorkerPool(
+			5,
+			checker,
+			healthCheckRepository,
+		)
+
+	scheduler :=
+		monitoring.NewScheduler(
+			serviceRepository,
+			workerPool,
+			5*time.Second,
+		)
+
 	serviceHandler :=
 		service.NewHandler(
 			serviceRepository,
 		)
+
 	router := httpapi.NewRouter(
 		serviceHandler,
 	)
-
+	go scheduler.Run(
+		appContext,
+	)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,
@@ -95,7 +127,7 @@ func main() {
 			)
 		}
 	}
-
+	appCancel()
 	shutdownContext, cancel :=
 		context.WithTimeout(
 			context.Background(),

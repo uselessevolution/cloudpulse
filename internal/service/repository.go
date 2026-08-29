@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -156,7 +157,98 @@ func (repository *Repository) FindAll(
 
 	return services, nil
 }
+func (repository *Repository) FindDueForChecks(
+	ctx context.Context,
+	now time.Time,
+) ([]Service, error) {
 
+	const query = `
+		SELECT
+			s.id,
+			s.name,
+			s.url,
+			s.expected_status,
+			s.check_interval_seconds,
+			s.timeout_seconds,
+			s.enabled,
+			s.created_at,
+			s.updated_at
+		FROM services s
+		LEFT JOIN LATERAL (
+			SELECT h.checked_at
+			FROM health_check_results h
+			WHERE h.service_id = s.id
+			ORDER BY h.checked_at DESC
+			LIMIT 1
+		) latest_check ON TRUE
+		WHERE
+			s.enabled = TRUE
+			AND (
+    			latest_check.checked_at IS NULL
+    			OR latest_check.checked_at
+        		+ make_interval(
+            	secs => s.check_interval_seconds
+        	)
+        	<= $1::timestamptz
+			)
+		ORDER BY s.id ASC
+	`
+
+	rows, err := repository.pool.Query(
+		ctx,
+		query,
+		now,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"query services due for checks: %w",
+			err,
+		)
+	}
+
+	defer rows.Close()
+
+	services := make(
+		[]Service,
+		0,
+	)
+
+	for rows.Next() {
+		var current Service
+
+		err := rows.Scan(
+			&current.ID,
+			&current.Name,
+			&current.URL,
+			&current.ExpectedStatus,
+			&current.CheckIntervalSeconds,
+			&current.TimeoutSeconds,
+			&current.Enabled,
+			&current.CreatedAt,
+			&current.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"scan due service: %w",
+				err,
+			)
+		}
+
+		services = append(
+			services,
+			current,
+		)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"iterate due services: %w",
+			err,
+		)
+	}
+
+	return services, nil
+}
 func (repository *Repository) FindByID(
 	ctx context.Context,
 	id int64,
