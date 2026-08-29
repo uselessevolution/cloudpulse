@@ -15,21 +15,32 @@ type ResultWriter interface {
 	) (Result, error)
 }
 
+type ResultEvaluator interface {
+	Evaluate(
+		ctx context.Context,
+		target service.Service,
+		result Result,
+	) error
+}
+
 type WorkerPool struct {
 	workerCount int
 	checker     *Checker
 	repository  ResultWriter
+	evaluator   ResultEvaluator
 }
 
 func NewWorkerPool(
 	workerCount int,
 	checker *Checker,
 	repository ResultWriter,
+	evaluator ResultEvaluator,
 ) *WorkerPool {
 	return &WorkerPool{
 		workerCount: workerCount,
 		checker:     checker,
 		repository:  repository,
+		evaluator:   evaluator,
 	}
 }
 
@@ -89,21 +100,21 @@ func (pool *WorkerPool) worker(
 				return
 			}
 
-			result :=
+			checkResult :=
 				pool.checker.Check(
 					ctx,
 					target,
 				)
 
-			_, err :=
+			savedResult, err :=
 				pool.repository.Create(
 					ctx,
 					CreateParams{
 						ServiceID:    target.ID,
-						StatusCode:   result.StatusCode,
-						LatencyMS:    result.LatencyMS,
-						Success:      result.Success,
-						ErrorMessage: result.ErrorMessage,
+						StatusCode:   checkResult.StatusCode,
+						LatencyMS:    checkResult.LatencyMS,
+						Success:      checkResult.Success,
+						ErrorMessage: checkResult.ErrorMessage,
 					},
 				)
 
@@ -118,12 +129,32 @@ func (pool *WorkerPool) worker(
 				continue
 			}
 
+			if pool.evaluator != nil {
+				err =
+					pool.evaluator.Evaluate(
+						ctx,
+						target,
+						savedResult,
+					)
+
+				if err != nil {
+					log.Printf(
+						"worker %d failed to evaluate incident state for service %d: %v",
+						workerID,
+						target.ID,
+						err,
+					)
+
+					continue
+				}
+			}
+
 			log.Printf(
 				"worker %d checked service %d: success=%t latency=%dms",
 				workerID,
 				target.ID,
-				result.Success,
-				result.LatencyMS,
+				savedResult.Success,
+				savedResult.LatencyMS,
 			)
 		}
 	}

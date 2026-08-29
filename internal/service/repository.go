@@ -40,15 +40,19 @@ func (repository *Repository) Create(
 		)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING
-			id,
-			name,
-			url,
-			expected_status,
-			check_interval_seconds,
-			timeout_seconds,
-			enabled,
-			created_at,
-			updated_at
+		id,
+		name,
+		url,
+		expected_status,
+		check_interval_seconds,
+		timeout_seconds,
+		enabled,
+		runtime_status,
+		consecutive_failures,
+		consecutive_successes,
+		last_checked_at,
+		created_at,
+		updated_at
 	`
 
 	var created Service
@@ -70,6 +74,10 @@ func (repository *Repository) Create(
 		&created.CheckIntervalSeconds,
 		&created.TimeoutSeconds,
 		&created.Enabled,
+		&created.RuntimeStatus,
+		&created.ConsecutiveFailures,
+		&created.ConsecutiveSuccesses,
+		&created.LastCheckedAt,
 		&created.CreatedAt,
 		&created.UpdatedAt,
 	)
@@ -90,16 +98,20 @@ func (repository *Repository) FindAll(
 
 	const query = `
 		SELECT
-			id,
-			name,
-			url,
-			expected_status,
-			check_interval_seconds,
-			timeout_seconds,
-			enabled,
-			created_at,
-			updated_at
-		FROM services
+				id,
+				name,
+				url,
+				expected_status,
+				check_interval_seconds,
+				timeout_seconds,
+				enabled,
+				runtime_status,
+				consecutive_failures,
+				consecutive_successes,
+				last_checked_at,
+				created_at,
+				updated_at
+			FROM services
 		ORDER BY id ASC
 	`
 
@@ -132,6 +144,10 @@ func (repository *Repository) FindAll(
 			&current.CheckIntervalSeconds,
 			&current.TimeoutSeconds,
 			&current.Enabled,
+			&current.RuntimeStatus,
+			&current.ConsecutiveFailures,
+			&current.ConsecutiveSuccesses,
+			&current.LastCheckedAt,
 			&current.CreatedAt,
 			&current.UpdatedAt,
 		)
@@ -171,6 +187,10 @@ func (repository *Repository) FindDueForChecks(
 			s.check_interval_seconds,
 			s.timeout_seconds,
 			s.enabled,
+			s.runtime_status,
+			s.consecutive_failures,
+			s.consecutive_successes,
+			s.last_checked_at,
 			s.created_at,
 			s.updated_at
 		FROM services s
@@ -224,6 +244,10 @@ func (repository *Repository) FindDueForChecks(
 			&current.CheckIntervalSeconds,
 			&current.TimeoutSeconds,
 			&current.Enabled,
+			&current.RuntimeStatus,
+			&current.ConsecutiveFailures,
+			&current.ConsecutiveSuccesses,
+			&current.LastCheckedAt,
 			&current.CreatedAt,
 			&current.UpdatedAt,
 		)
@@ -263,6 +287,10 @@ func (repository *Repository) FindByID(
 			check_interval_seconds,
 			timeout_seconds,
 			enabled,
+			runtime_status,
+			consecutive_failures,
+			consecutive_successes,
+			last_checked_at,
 			created_at,
 			updated_at
 		FROM services
@@ -283,6 +311,10 @@ func (repository *Repository) FindByID(
 		&found.CheckIntervalSeconds,
 		&found.TimeoutSeconds,
 		&found.Enabled,
+		&found.RuntimeStatus,
+		&found.ConsecutiveFailures,
+		&found.ConsecutiveSuccesses,
+		&found.LastCheckedAt,
 		&found.CreatedAt,
 		&found.UpdatedAt,
 	)
@@ -328,4 +360,77 @@ func (repository *Repository) Delete(
 	}
 
 	return nil
+}
+func (repository *Repository) UpdateRuntimeState(
+	ctx context.Context,
+	id int64,
+	runtimeStatus string,
+	consecutiveFailures int,
+	consecutiveSuccesses int,
+	lastCheckedAt time.Time,
+) (Service, error) {
+
+	const query = `
+		UPDATE services
+		SET
+			runtime_status = $2,
+			consecutive_failures = $3,
+			consecutive_successes = $4,
+			last_checked_at = $5,
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING
+			id,
+			name,
+			url,
+			expected_status,
+			check_interval_seconds,
+			timeout_seconds,
+			enabled,
+			runtime_status,
+			consecutive_failures,
+			consecutive_successes,
+			last_checked_at,
+			created_at,
+			updated_at
+	`
+
+	var updated Service
+
+	err := repository.pool.QueryRow(
+		ctx,
+		query,
+		id,
+		runtimeStatus,
+		consecutiveFailures,
+		consecutiveSuccesses,
+		lastCheckedAt,
+	).Scan(
+		&updated.ID,
+		&updated.Name,
+		&updated.URL,
+		&updated.ExpectedStatus,
+		&updated.CheckIntervalSeconds,
+		&updated.TimeoutSeconds,
+		&updated.Enabled,
+		&updated.RuntimeStatus,
+		&updated.ConsecutiveFailures,
+		&updated.ConsecutiveSuccesses,
+		&updated.LastCheckedAt,
+		&updated.CreatedAt,
+		&updated.UpdatedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Service{}, ErrNotFound
+	}
+
+	if err != nil {
+		return Service{}, fmt.Errorf(
+			"update service runtime state: %w",
+			err,
+		)
+	}
+
+	return updated, nil
 }

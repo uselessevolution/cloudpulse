@@ -14,6 +14,7 @@ import (
 	"cloudpulse/internal/database"
 	"cloudpulse/internal/healthcheck"
 	"cloudpulse/internal/httpapi"
+	"cloudpulse/internal/incident"
 	"cloudpulse/internal/monitoring"
 	"cloudpulse/internal/service"
 )
@@ -49,7 +50,20 @@ func main() {
 		healthcheck.NewRepository(
 			dbPool,
 		)
+	incidentRepository :=
+		incident.NewRepository(
+			dbPool,
+		)
 
+	incidentHandler :=
+		incident.NewHandler(
+			incidentRepository,
+		)
+	incidentEvaluator :=
+		incident.NewEvaluator(
+			serviceRepository,
+			incidentRepository,
+		)
 	checker :=
 		healthcheck.NewChecker()
 
@@ -58,6 +72,7 @@ func main() {
 			5,
 			checker,
 			healthCheckRepository,
+			incidentEvaluator,
 		)
 
 	scheduler :=
@@ -72,9 +87,11 @@ func main() {
 			serviceRepository,
 		)
 
-	router := httpapi.NewRouter(
-		serviceHandler,
-	)
+	router :=
+		httpapi.NewRouter(
+			serviceHandler,
+			incidentHandler,
+		)
 	go scheduler.Run(
 		appContext,
 	)

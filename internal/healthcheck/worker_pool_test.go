@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"cloudpulse/internal/service"
 )
@@ -30,11 +31,31 @@ func (writer *fakeResultWriter) Create(
 
 	return Result{
 		ServiceID:    params.ServiceID,
+		CheckedAt:    time.Now(),
 		StatusCode:   params.StatusCode,
 		LatencyMS:    params.LatencyMS,
 		Success:      params.Success,
 		ErrorMessage: params.ErrorMessage,
 	}, nil
+}
+
+type fakeResultEvaluator struct {
+	mutex sync.Mutex
+	calls int
+}
+
+func (evaluator *fakeResultEvaluator) Evaluate(
+	ctx context.Context,
+	target service.Service,
+	result Result,
+) error {
+
+	evaluator.mutex.Lock()
+	defer evaluator.mutex.Unlock()
+
+	evaluator.calls++
+
+	return nil
 }
 
 func TestWorkerPoolProcessesAllServices(
@@ -85,6 +106,9 @@ func TestWorkerPoolProcessesAllServices(
 			),
 		}
 
+	evaluator :=
+		&fakeResultEvaluator{}
+
 	checker := NewChecker()
 
 	pool :=
@@ -92,6 +116,7 @@ func TestWorkerPoolProcessesAllServices(
 			2,
 			checker,
 			writer,
+			evaluator,
 		)
 
 	pool.Run(
@@ -99,22 +124,44 @@ func TestWorkerPoolProcessesAllServices(
 		targets,
 	)
 
-	if len(writer.results) !=
-		len(targets) {
+	writer.mutex.Lock()
+	resultCount := len(writer.results)
+	writer.mutex.Unlock()
+
+	if resultCount != len(targets) {
 		t.Fatalf(
 			"expected %d results, got %d",
 			len(targets),
-			len(writer.results),
+			resultCount,
 		)
 	}
+
+	writer.mutex.Lock()
 
 	for _, result := range writer.results {
 
 		if !result.Success {
+			writer.mutex.Unlock()
+
 			t.Fatalf(
 				"expected result for service %d to succeed",
 				result.ServiceID,
 			)
 		}
+	}
+
+	writer.mutex.Unlock()
+
+	evaluator.mutex.Lock()
+	evaluationCalls :=
+		evaluator.calls
+	evaluator.mutex.Unlock()
+
+	if evaluationCalls != len(targets) {
+		t.Fatalf(
+			"expected evaluator to be called %d times, got %d",
+			len(targets),
+			evaluationCalls,
+		)
 	}
 }

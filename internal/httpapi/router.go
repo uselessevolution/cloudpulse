@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"cloudpulse/internal/incident"
 	"cloudpulse/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -11,6 +12,7 @@ import (
 
 func NewRouter(
 	serviceHandler *service.Handler,
+	incidentHandler *incident.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 
@@ -40,6 +42,21 @@ func NewRouter(
 			router.Delete(
 				"/{id}",
 				serviceHandler.Delete,
+			)
+		},
+	)
+
+	router.Route(
+		"/api/incidents",
+		func(router chi.Router) {
+			router.Get(
+				"/",
+				incidentHandler.FindAll,
+			)
+
+			router.Get(
+				"/{id}",
+				incidentHandler.FindByID,
 			)
 		},
 	)

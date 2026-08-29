@@ -67,6 +67,7 @@ func TestSchedulerRunsMonitoringCycle(
 			2,
 			checker,
 			writer,
+			nil,
 		)
 
 	scheduler :=
