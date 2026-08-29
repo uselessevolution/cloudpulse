@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloudpulse/internal/healthcheck"
+	"cloudpulse/internal/metrics"
 	"cloudpulse/internal/service"
 )
 
@@ -166,6 +167,8 @@ func (evaluator *Evaluator) handleFailure(
 			)
 		}
 
+		metrics.OpenIncidents.Inc()
+
 		return nil
 	}
 
@@ -285,6 +288,8 @@ func (evaluator *Evaluator) handleSuccess(
 			err,
 		)
 	}
+
+	metrics.OpenIncidents.Dec()
 
 	return nil
 }

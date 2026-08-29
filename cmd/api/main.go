@@ -15,11 +15,13 @@ import (
 	"cloudpulse/internal/healthcheck"
 	"cloudpulse/internal/httpapi"
 	"cloudpulse/internal/incident"
+	"cloudpulse/internal/metrics"
 	"cloudpulse/internal/monitoring"
 	"cloudpulse/internal/service"
 )
 
 func main() {
+	metrics.Register()
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -54,7 +56,28 @@ func main() {
 		incident.NewRepository(
 			dbPool,
 		)
+	openIncidentCount, err :=
+		incidentRepository.CountOpen(
+			appContext,
+		)
 
+	if err != nil {
+		log.Fatalf(
+			"failed to count open incidents: %v",
+			err,
+		)
+	}
+
+	metrics.OpenIncidents.Set(
+		float64(
+			openIncidentCount,
+		),
+	)
+
+	log.Printf(
+		"event=open_incident_metric_initialized count=%d",
+		openIncidentCount,
+	)
 	incidentHandler :=
 		incident.NewHandler(
 			incidentRepository,

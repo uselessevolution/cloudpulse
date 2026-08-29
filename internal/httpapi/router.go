@@ -8,6 +8,7 @@ import (
 	"cloudpulse/internal/service"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func NewRouter(
@@ -20,7 +21,10 @@ func NewRouter(
 		"/health",
 		healthHandler,
 	)
-
+	router.Handle(
+		"/metrics",
+		promhttp.Handler(),
+	)
 	router.Route(
 		"/api/services",
 		func(router chi.Router) {

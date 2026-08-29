@@ -3,8 +3,10 @@ package healthcheck
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 
+	"cloudpulse/internal/metrics"
 	"cloudpulse/internal/service"
 )
 
@@ -120,7 +122,7 @@ func (pool *WorkerPool) worker(
 
 			if err != nil {
 				log.Printf(
-					"worker %d failed to save health check for service %d: %v",
+					"event=health_check_persist_failed worker=%d service_id=%d error=%q",
 					workerID,
 					target.ID,
 					err,
@@ -128,6 +130,31 @@ func (pool *WorkerPool) worker(
 
 				continue
 			}
+
+			serviceID :=
+				strconv.FormatInt(
+					target.ID,
+					10,
+				)
+
+			metrics.HealthChecksTotal.
+				WithLabelValues(
+					serviceID,
+					strconv.FormatBool(
+						savedResult.Success,
+					),
+				).
+				Inc()
+
+			metrics.HealthCheckLatency.
+				WithLabelValues(
+					serviceID,
+				).
+				Observe(
+					float64(
+						savedResult.LatencyMS,
+					) / 1000,
+				)
 
 			if pool.evaluator != nil {
 				err =
@@ -139,7 +166,7 @@ func (pool *WorkerPool) worker(
 
 				if err != nil {
 					log.Printf(
-						"worker %d failed to evaluate incident state for service %d: %v",
+						"event=incident_evaluation_failed worker=%d service_id=%d error=%q",
 						workerID,
 						target.ID,
 						err,
@@ -150,7 +177,7 @@ func (pool *WorkerPool) worker(
 			}
 
 			log.Printf(
-				"worker %d checked service %d: success=%t latency=%dms",
+				"event=health_check worker=%d service_id=%d success=%t latency_ms=%d",
 				workerID,
 				target.ID,
 				savedResult.Success,

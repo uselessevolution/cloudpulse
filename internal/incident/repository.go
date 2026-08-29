@@ -395,3 +395,31 @@ func (repository *Repository) FindByID(
 
 	return found, nil
 }
+func (repository *Repository) CountOpen(
+	ctx context.Context,
+) (int, error) {
+
+	const query = `
+		SELECT COUNT(*)
+		FROM incidents
+		WHERE status = 'OPEN'
+	`
+
+	var count int
+
+	err := repository.pool.QueryRow(
+		ctx,
+		query,
+	).Scan(
+		&count,
+	)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"count open incidents: %w",
+			err,
+		)
+	}
+
+	return count, nil
+}

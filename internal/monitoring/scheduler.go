@@ -38,7 +38,7 @@ func (scheduler *Scheduler) Run(
 	ctx context.Context,
 ) {
 	log.Printf(
-		"monitoring scheduler started with tick interval %s",
+		"event=monitoring_scheduler_started tick_interval=%s",
 		scheduler.tickInterval,
 	)
 
@@ -54,7 +54,7 @@ func (scheduler *Scheduler) Run(
 		select {
 		case <-ctx.Done():
 			log.Println(
-				"monitoring scheduler stopped",
+				"event=monitoring_scheduler_stopped",
 			)
 			return
 
@@ -76,8 +76,8 @@ func (scheduler *Scheduler) runCycle(
 
 	if err != nil {
 		log.Printf(
-			"monitoring cycle failed to load due services: %v",
-			err,
+			"event=monitoring_cycle due_services=%d",
+			len(services),
 		)
 		return
 	}
@@ -87,8 +87,8 @@ func (scheduler *Scheduler) runCycle(
 	}
 
 	log.Printf(
-		"monitoring cycle found %d service(s) due for checking",
-		len(services),
+		"event=monitoring_cycle_failed error=%q",
+		err,
 	)
 
 	scheduler.workerPool.Run(
