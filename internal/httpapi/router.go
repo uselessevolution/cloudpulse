@@ -10,6 +10,7 @@ import (
 	"cloudpulse/internal/ai"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -19,7 +20,31 @@ func NewRouter(
 	aiHandler *ai.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
-
+	router.Use(
+		cors.Handler(
+			cors.Options{
+				AllowedOrigins: []string{
+					"http://localhost:5173",
+				},
+				AllowedMethods: []string{
+					http.MethodGet,
+					http.MethodPost,
+					http.MethodPut,
+					http.MethodPatch,
+					http.MethodDelete,
+					http.MethodOptions,
+				},
+				AllowedHeaders: []string{
+					"Accept",
+					"Authorization",
+					"Content-Type",
+				},
+				ExposedHeaders:   []string{},
+				AllowCredentials: false,
+				MaxAge:           300,
+			},
+		),
+	)
 	router.Get(
 		"/health",
 		healthHandler,

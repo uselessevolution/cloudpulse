@@ -108,6 +108,11 @@ func (handler *Handler) AnalyzeIncident(
 		return
 	}
 
+	log.Printf(
+		"event=ai_incident_analysis_completed incident_id=%d",
+		incidentID,
+	)
+
 	writeJSON(
 		writer,
 		http.StatusOK,
