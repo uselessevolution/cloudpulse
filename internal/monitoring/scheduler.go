@@ -76,8 +76,8 @@ func (scheduler *Scheduler) runCycle(
 
 	if err != nil {
 		log.Printf(
-			"event=monitoring_cycle due_services=%d",
-			len(services),
+			"event=monitoring_cycle_failed error=%q",
+			err,
 		)
 		return
 	}
@@ -87,8 +87,8 @@ func (scheduler *Scheduler) runCycle(
 	}
 
 	log.Printf(
-		"event=monitoring_cycle_failed error=%q",
-		err,
+		"event=monitoring_cycle due_services=%d",
+		len(services),
 	)
 
 	scheduler.workerPool.Run(

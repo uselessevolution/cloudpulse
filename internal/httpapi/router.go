@@ -7,6 +7,8 @@ import (
 	"cloudpulse/internal/incident"
 	"cloudpulse/internal/service"
 
+	"cloudpulse/internal/ai"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -14,6 +16,7 @@ import (
 func NewRouter(
 	serviceHandler *service.Handler,
 	incidentHandler *incident.Handler,
+	aiHandler *ai.Handler,
 ) http.Handler {
 	router := chi.NewRouter()
 
@@ -61,6 +64,11 @@ func NewRouter(
 			router.Get(
 				"/{id}",
 				incidentHandler.FindByID,
+			)
+
+			router.Post(
+				"/{id}/ai-summary",
+				aiHandler.AnalyzeIncident,
 			)
 		},
 	)

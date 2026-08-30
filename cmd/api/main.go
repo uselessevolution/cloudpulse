@@ -1,15 +1,7 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
+	"cloudpulse/internal/ai"
 	"cloudpulse/internal/config"
 	"cloudpulse/internal/database"
 	"cloudpulse/internal/healthcheck"
@@ -18,6 +10,15 @@ import (
 	"cloudpulse/internal/metrics"
 	"cloudpulse/internal/monitoring"
 	"cloudpulse/internal/service"
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -55,6 +56,56 @@ func main() {
 	incidentRepository :=
 		incident.NewRepository(
 			dbPool,
+		)
+	aiContextBuilder :=
+		ai.NewContextBuilder(
+			incidentRepository,
+			serviceRepository,
+			healthCheckRepository,
+			10,
+		)
+	var incidentAnalyzer ai.IncidentAnalyzer
+
+	switch strings.ToLower(
+		cfg.AIProvider,
+	) {
+	case "mock":
+		incidentAnalyzer =
+			ai.NewMockAnalyzer()
+
+		log.Printf(
+			"event=ai_provider_initialized provider=mock",
+		)
+
+	case "openai":
+		if os.Getenv(
+			"OPENAI_API_KEY",
+		) == "" {
+			log.Fatal(
+				"OPENAI_API_KEY is required when AI_PROVIDER=openai",
+			)
+		}
+
+		incidentAnalyzer =
+			ai.NewOpenAIAnalyzer(
+				cfg.OpenAIModel,
+			)
+
+		log.Printf(
+			"event=ai_provider_initialized provider=openai model=%s",
+			cfg.OpenAIModel,
+		)
+
+	default:
+		log.Fatalf(
+			"unsupported AI_PROVIDER: %s",
+			cfg.AIProvider,
+		)
+	}
+	aiHandler :=
+		ai.NewHandler(
+			aiContextBuilder,
+			incidentAnalyzer,
 		)
 	openIncidentCount, err :=
 		incidentRepository.CountOpen(
@@ -114,6 +165,7 @@ func main() {
 		httpapi.NewRouter(
 			serviceHandler,
 			incidentHandler,
+			aiHandler,
 		)
 	go scheduler.Run(
 		appContext,
